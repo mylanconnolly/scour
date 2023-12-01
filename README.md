@@ -50,3 +50,21 @@ track of that for you.
 
 Regardless of the criteria you use, an `ActiveRecord::Relation` is returned so
 you can chain ActiveRecord methods just as you'd expect.
+
+Another example would be:
+
+```ruby
+User.scour(or: {
+  username: {
+    eq: 'foo'
+  },
+  email: {
+    eq: 'foo'
+  }
+})
+```
+
+This would check for users who either have a username equal to 'foo' or an email
+equal to 'foo'. Note that you can also use "and", if you want. The "and" and
+"or" blocks can be nested as deeply as you'd like, which allows for very complex
+criteria to be specified, particularly when combined with relationships.
