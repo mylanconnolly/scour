@@ -4,7 +4,7 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 # Specify your gem's dependencies in scour.gemspec.
 gemspec
 
-gem 'puma'
+gem 'puma', '>= 6.3.1'
 
 gem 'sqlite3'
 
