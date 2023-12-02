@@ -1,4 +1,6 @@
 module Scour
+  # This is the class that parses the criteria hash and converts it into an
+  # Arel query.
   class CriteriaParser
     # These are the predicates already available in Arel, which we can just use
     # as-is.
@@ -31,13 +33,31 @@ module Scour
 
     def parse
       query = @relation.where(parse_criteria(@klass))
-      @joins.reduce(query) { |rel, join| rel.left_joins(join) }
+      query = @joins.reduce(query) { |rel, join| maybe_join(rel, join) }
+      add_sort(query)
     end
 
     private
 
+    def add_sort(query)
+      sort = @criteria[:_sort]
+      return query unless sort
+
+      query.order(parse_sort(sort))
+    end
+
+    # We only want to add a join if it's not already there.
+    def maybe_join(rel, join)
+      if rel.left_outer_joins_values.include?(join) || rel.joins_values.include?(join)
+        rel
+      else
+        rel.left_joins(join)
+      end
+    end
+
     def parse_criteria(klass)
       @criteria
+        .reject { |key, _| key.to_sym == :_sort }
         .map { |key, value| parse_criteria_group(key, value, klass) }
         .compact
         .reduce(&:and)
@@ -49,6 +69,20 @@ module Scour
       when :and then parse_and(group, klass)
       else parse_node(key, group, klass)
       end
+    end
+
+    def parse_sort(group)
+      case group
+      when Array then Arel::Nodes::StringJoin.new(group.map { |g| parse_sort(g) })
+      when String, Symbol then parse_sort_value(group)
+      end
+    end
+
+    def parse_sort_value(value)
+      direction = value.to_s.start_with?('-') ? :desc : :asc
+      attribute = value.to_s.delete_prefix('-')
+      column = column_name(@klass, attribute)
+      column.send(direction)
     end
 
     def parse_or(group, klass)
@@ -125,7 +159,7 @@ module Scour
         k = klass
 
         parts.each do |part|
-          return k.arel_table[column] if k.column_names.include?(part)
+          return k.arel_table[part] if k.column_names.include?(part)
 
           k = k.reflect_on_association(part).klass
           @joins |= [part.to_sym]

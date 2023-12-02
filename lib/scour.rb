@@ -4,6 +4,4 @@ require 'scour/criteria_parser'
 require 'scour/searchable'
 require 'scour/railtie'
 
-module Scour
-  # Your code goes here...
-end
+module Scour; end

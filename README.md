@@ -84,3 +84,14 @@ User.scour(updated_at: { gteq: { column: 'comments.created_at' } })
 
 Note that for now, you can only go one level deep. If you need to join on other
 associations, you can add `has_many ... :through` associations to your model.
+
+If you'd like to sort the result, you can use regular ActiveRecord query methods
+or use the scour syntax, as shown below:
+
+```ruby
+# Sort by one attribute:
+User.scour(_sort: 'username')
+
+# Sort by multiple attributes in order:
+User.scour(_sort: %w[username email])
+```
