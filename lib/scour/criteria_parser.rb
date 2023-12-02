@@ -31,7 +31,7 @@ module Scour
 
     def parse
       query = @relation.where(parse_criteria(@klass))
-      @joins.reduce(query) { |rel, join| rel.joins(join) }
+      @joins.reduce(query) { |rel, join| rel.left_joins(join) }
     end
 
     private
@@ -70,7 +70,7 @@ module Scour
         klass.arel_table.grouping(parse_column_criteria(key, group, klass))
       elsif key.to_s.include?('.')
         col, *fields = key.to_s.split('.')
-        criteria = klass.arel_table[col]
+        criteria = column_name(klass, col)
 
         fields.each_with_index do |field, index|
           criteria = if index == fields.length - 1
@@ -100,13 +100,39 @@ module Scour
 
     def parse_column_criteria(key, value, klass)
       value
-        .map { |pred, arg| klass.arel_table[key].send(pred, arg) if AREL_PREDICATES.include?(pred.to_sym) }
+        .map { |pred, arg| parse_column_expression(key, pred, arg, klass) }
         .compact
         .reduce(&:and)
     end
 
+    def parse_column_expression(key, pred, arg, klass)
+      column = column_name(klass, key)
+
+      if arg.is_a?(Hash) && arg.key?(:column)
+        column.send(pred, column_name(klass, arg[:column]))
+      elsif AREL_PREDICATES.include?(pred.to_sym)
+        column.send(pred, arg)
+      end
+    end
+
     def associations(klass)
       klass.reflect_on_all_associations.index_by(&:name)
+    end
+
+    def column_name(klass, column)
+      if column.to_s.include?('.')
+        parts = column.to_s.split('.')
+        k = klass
+
+        parts.each do |part|
+          return k.arel_table[column] if k.column_names.include?(part)
+
+          k = k.reflect_on_association(part).klass
+          @joins |= [part.to_sym]
+        end
+      else
+        klass.arel_table[column]
+      end
     end
   end
 end

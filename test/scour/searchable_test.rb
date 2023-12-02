@@ -41,7 +41,7 @@ module Scour
         "users".*
       FROM
         "users"
-        INNER JOIN "comments" ON "comments"."user_id" = "users"."id"
+        LEFT OUTER JOIN "comments" ON "comments"."user_id" = "users"."id"
       WHERE
         ("users"."last_name" = 'Doe')
         AND ("users"."first_name" = 'John')

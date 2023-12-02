@@ -68,3 +68,19 @@ This would check for users who either have a username equal to 'foo' or an email
 equal to 'foo'. Note that you can also use "and", if you want. The "and" and
 "or" blocks can be nested as deeply as you'd like, which allows for very complex
 criteria to be specified, particularly when combined with relationships.
+
+Furthermore, you can compare columns in Scour. In the following example, we are
+checking for users who have the same value as a username and email address:
+
+```ruby
+User.scour(username: { eq: { column: 'email' } })
+```
+
+These columns can exist on relations, as well. For example:
+
+```ruby
+User.scour(updated_at: { gteq: { column: 'comments.created_at' } })
+```
+
+Note that for now, you can only go one level deep. If you need to join on other
+associations, you can add `has_many ... :through` associations to your model.
