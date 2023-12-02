@@ -94,4 +94,9 @@ User.scour(_sort: 'username')
 
 # Sort by multiple attributes in order:
 User.scour(_sort: %w[username email])
+
+# You can also sort by associations:
+User.scour(_sort: 'comments.created_at')
 ```
+
+Note that you can add a `-` prefix to any sort to make it descending.
