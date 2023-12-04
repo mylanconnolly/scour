@@ -1,6 +1,8 @@
 require_relative 'lib/scour/version'
 
 Gem::Specification.new do |spec|
+  spec.required_ruby_version = '~> 3.0'
+
   spec.name        = 'scour'
   spec.version     = Scour::VERSION
   spec.authors     = ['Mylan Connolly']
