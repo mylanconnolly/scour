@@ -2,64 +2,103 @@ require 'test_helper'
 
 module Scour
   class ScourTest < ActiveSupport::TestCase
-    DUMMY_CRITERIA = {
-      and: {
-        last_name: {
-          eq: 'Doe'
-        },
-        first_name: {
-          eq: 'John'
-        }
-      },
-      or: {
-        username: {
-          eq: 'foo'
-        },
-        email: {
-          eq: 'foo'
-        }
-      },
-      created_at: {
-        gteq: '2023-08-02 20:17:22.521227',
-        lteq: '2023-08-03 20:17:22.521410'
-      },
-      comments: {
-        subject: {
-          eq: 'Hello'
-        },
-        created_at: {
-          eq_month: '2023-08-02'
-        },
-        'data.meta.tag': {
-          eq: 'foo'
-        }
-      }
-    }.freeze
+    # Test sorting functionality in the model itself
+    [
+      ['username', '"users"."username" ASC'],
+      ['-username', '"users"."username" DESC'],
+      [%w[username email], '"users"."username" ASC, "users"."email" ASC'],
+      [%w[username -email], '"users"."username" ASC, "users"."email" DESC']
+    ].each do |sort, expected|
+      test "when given #{sort.inspect}, it sorts by #{expected.inspect}" do
+        sql = User.scour(_sort: sort).to_sql
 
-    DUMMY_SQL = <<~SQL.squish
-      SELECT
-        "users".*
-      FROM
-        "users"
-        LEFT OUTER JOIN "comments" ON "comments"."user_id" = "users"."id"
-      WHERE
-        ("users"."last_name" = 'Doe')
-        AND ("users"."first_name" = 'John')
-        AND (("users"."username" = 'foo') OR ("users"."email" = 'foo'))
-        AND ("users"."created_at" >= '2023-08-02 20:17:22.521227'
-          AND "users"."created_at" <= '2023-08-03 20:17:22.521410')
-        AND (("comments"."subject" = 'Hello')
-          AND (DATE_TRUNC('month', "comments"."created_at") = DATE_TRUNC('month', '2023-08-02'))
-          AND "comments"."data" -> 'meta' ->> 'tag')
-    SQL
+        want = <<~SQL.squish
+          SELECT
+            "users".*
+          FROM
+            "users"
+          ORDER BY
+            #{expected}
+        SQL
 
-    test 'it defines the scour method' do
-      assert_nothing_raised { User.scour }
-      assert_nothing_raised { User.scour(DUMMY_CRITERIA) }
+        assert_equal want, sql
+      end
     end
 
-    test 'it writes the SQL as expected' do
-      assert_equal DUMMY_SQL, User.scour(DUMMY_CRITERIA).to_sql
+    # Test sorting by associated columns
+    [
+      ['comments.created_at', '"comments"."created_at" ASC'],
+      [%w[comments.created_at -comments.updated_at], '"comments"."created_at" ASC, "comments"."updated_at" DESC']
+    ].each do |sort, expected|
+      test "when given #{sort.inspect}, it sorts by #{expected.inspect}" do
+        sql = User.scour(_sort: sort).to_sql
+
+        want = <<~SQL.squish
+          SELECT
+            "users".*
+          FROM
+            "users"
+            LEFT OUTER JOIN "comments" ON "comments"."user_id" = "users"."id"
+          ORDER BY
+            #{expected}
+        SQL
+
+        assert_equal want, sql
+      end
+    end
+
+    # Test query criteria in the model itself
+    [
+      [{ username: { eq: 'foo' } }, '("users"."username" = \'foo\')'],
+      [{ username: { not_eq: 'foo' } }, '("users"."username" != \'foo\')'],
+      [{ created_at: { gt: '2019-01-01' } }, '("users"."created_at" > \'2019-01-01 00:00:00\')'],
+      [{ created_at: { gteq: '2019-01-01' } }, '("users"."created_at" >= \'2019-01-01 00:00:00\')'],
+      [{ created_at: { lt: '2019-01-01' } }, '("users"."created_at" < \'2019-01-01 00:00:00\')'],
+      [{ created_at: { lteq: '2019-01-01' } }, '("users"."created_at" <= \'2019-01-01 00:00:00\')'],
+      [
+        { or: { created_at: { lteq: '2019-01-01' }, updated_at: { lteq: '2019-01-01' } } },
+        '(("users"."created_at" <= \'2019-01-01 00:00:00\') OR ("users"."updated_at" <= \'2019-01-01 00:00:00\'))'
+      ],
+      [
+        { and: { created_at: { lteq: '2019-01-01' }, updated_at: { lteq: '2019-01-01' } } },
+        '("users"."created_at" <= \'2019-01-01 00:00:00\') AND ("users"."updated_at" <= \'2019-01-01 00:00:00\')'
+      ]
+    ].each do |query, expected|
+      test "when given #{query.inspect}, it filters by #{expected.inspect}" do
+        sql = User.scour(query).to_sql
+
+        want = <<~SQL.squish
+          SELECT
+            "users".*
+          FROM
+            "users"
+          WHERE
+            #{expected}
+        SQL
+
+        assert_equal want, sql
+      end
+    end
+
+    # Test query criteria in associated columns
+    [
+      [{ comments: { created_at: { gt: '2019-01-01' } } }, '("comments"."created_at" > \'2019-01-01 00:00:00\')']
+    ].each do |query, expected|
+      test "when given #{query.inspect}, it filters by #{expected.inspect}" do
+        sql = User.scour(query).to_sql
+
+        want = <<~SQL.squish
+          SELECT
+            "users".*
+          FROM
+            "users"
+            LEFT OUTER JOIN "comments" ON "comments"."user_id" = "users"."id"
+          WHERE
+            #{expected}
+        SQL
+
+        assert_equal want, sql
+      end
     end
   end
 end

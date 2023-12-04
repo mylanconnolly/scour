@@ -33,8 +33,8 @@ module Scour
 
     def parse
       query = @relation.where(parse_criteria(@klass))
-      query = @joins.reduce(query) { |rel, join| maybe_join(rel, join) }
-      add_sort(query)
+      query = add_sort(query)
+      @joins.reduce(query) { |rel, join| maybe_join(rel, join) }
     end
 
     private
@@ -155,6 +155,7 @@ module Scour
 
     def column_name(klass, column)
       if column.to_s.include?('.')
+
         parts = column.to_s.split('.')
         k = klass
 
